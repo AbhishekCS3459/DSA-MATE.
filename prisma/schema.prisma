@@ -1,0 +1,147 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id        String         @id @default(cuid())
+  email     String         @unique
+  name      String?
+  image     String?
+  password  String?
+  role      Role           @default(USER)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  notes     UserNotes[]
+  progress  UserProgress[]
+  accounts  Account[]
+  sessions  Session[]
+
+  @@map("users")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Question {
+  id             String         @id @default(cuid())
+  title          String
+  difficulty     Difficulty
+  frequency      Int?
+  acceptanceRate Float?
+  link           String?
+  topics         String[]
+  companies      String[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  changeLogs     ChangeLog[]
+  notes          UserNotes[]
+  progress       UserProgress[]
+
+  @@map("questions")
+}
+
+model UserProgress {
+  id         String         @id @default(cuid())
+  userId     String
+  questionId String
+  status     ProgressStatus @default(NOT_DONE)
+  updatedAt  DateTime       @updatedAt
+  question   Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@map("user_progress")
+}
+
+model UserNotes {
+  id           String   @id @default(cuid())
+  questionId   String
+  userId       String
+  content      String
+  templateUsed String?
+  voiceNoteUrl String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  question     Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notes")
+}
+
+model ChangeLog {
+  id         String     @id @default(cuid())
+  questionId String?
+  type       ChangeType
+  changes    Json
+  createdAt  DateTime   @default(now())
+  question   Question?  @relation(fields: [questionId], references: [id])
+
+  @@map("change_logs")
+}
+
+// Enums
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum ProgressStatus {
+  DONE
+  NOT_DONE
+}
+
+enum ChangeType {
+  NEW
+  UPDATED
+  DELETED
+}
