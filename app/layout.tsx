@@ -23,6 +23,12 @@ export const metadata: Metadata = {
   title: "DSA Mate",
   description: "Track your Data Structures and Algorithms practice progress",
   generator: "v0.app",
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({
