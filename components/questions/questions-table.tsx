@@ -163,38 +163,6 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
 
   return (
     <div className="overflow-visible">
-      {/* Data Quality Warning */}
-      {questions.some(q => 
-        q.topics.some(t => t.includes('"') || t.includes("'") || t === 'undefined') ||
-        q.companies.some(c => c.includes('"') || c.includes("'") || c === 'undefined')
-      ) && (
-        <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md mb-4">
-          <div className="flex items-start gap-3">
-            <div className="w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-              ⚠️
-            </div>
-            <div className="flex-1">
-              <h4 className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                Data Quality Issue Detected
-              </h4>
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                Some questions have malformed topics or companies (with quotes, duplicates, or undefined values). 
-                The table will display cleaned versions, but you may want to contact an admin to fix the underlying data.
-              </p>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={fetchQuestions}
-              disabled={loading}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-          </div>
-        </div>
-      )}
 
       <Table>
         <TableHeader>
