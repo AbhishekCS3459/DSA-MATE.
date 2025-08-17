@@ -27,8 +27,13 @@ export async function GET(request: NextRequest) {
     const sortField =
       (searchParams.get("sortField") as "title" | "difficulty" | "frequency" | "acceptanceRate") || "title"
     const sortDirection = (searchParams.get("sortDirection") as "asc" | "desc") || "asc"
-    const page = Number.parseInt(searchParams.get("page") || "1")
+    let page = Number.parseInt(searchParams.get("page") || "1")
     const limit = Number.parseInt(searchParams.get("limit") || "50")
+
+    // Restrict non-authenticated users to page 1 only
+    if (!session?.user && page > 1) {
+      page = 1
+    }
 
     // Check user subscription status
     let maxQuestions = 100 // Default for free users
@@ -265,6 +270,8 @@ export async function GET(request: NextRequest) {
       },
       subscription: subscriptionStatus,
       premiumRequired: !canAccessAll && totalCount > maxQuestions,
+      isAuthenticated: !!session?.user,
+      isPageRestricted: !session?.user && page > 1,
     }
 
     // Cache the response data if cacheable

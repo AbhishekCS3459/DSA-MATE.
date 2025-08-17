@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { QuestionFilters, SortOptions } from "@/lib/types"
 import { ArrowUpDown, Filter, RefreshCw, Search, X } from "lucide-react"
+import { useSession } from "next-auth/react"
 import { useEffect, useState } from "react"
 
 interface QuestionsFiltersProps {
@@ -18,6 +19,7 @@ interface QuestionsFiltersProps {
 }
 
 export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSortChange }: QuestionsFiltersProps) {
+  const { data: session } = useSession()
   const [availableTopics, setAvailableTopics] = useState<string[]>([])
   const [availableCompanies, setAvailableCompanies] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
@@ -26,6 +28,13 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
     // Fetch available filter options
     fetchFilterOptions()
   }, [])
+
+  // Reset status filter to "ALL" for non-authenticated users
+  useEffect(() => {
+    if (!session?.user && filters.status !== "ALL") {
+      onFiltersChange({ ...filters, status: "ALL" })
+    }
+  }, [session, filters.status, onFiltersChange])
 
   // Function to clean topics and companies data
   const cleanFilterData = (data: string[]) => {
@@ -174,16 +183,27 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
         </Select>
 
         {/* Status Filter */}
-        <Select value={filters.status === "ALL" ? "all" : filters.status || "all"} onValueChange={handleStatusChange}>
-          <SelectTrigger className="w-full sm:w-[140px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="DONE">Completed</SelectItem>
-            <SelectItem value="NOT_DONE">Not Done</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="relative">
+          <Select 
+            value={filters.status === "ALL" ? "all" : filters.status || "all"} 
+            onValueChange={handleStatusChange}
+            disabled={!session?.user}
+          >
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder={session?.user ? "Status" : "Sign in for status"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="DONE">Completed</SelectItem>
+              <SelectItem value="NOT_DONE">Not Done</SelectItem>
+            </SelectContent>
+          </Select>
+          {!session?.user && (
+            <div className="absolute -bottom-6 left-0 text-xs text-muted-foreground">
+              Sign in to filter by status
+            </div>
+          )}
+        </div>
 
         {/* Sort Options */}
         <Select

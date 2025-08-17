@@ -9,14 +9,20 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import type { Question, QuestionFilters, SortOptions } from "@/lib/types"
 import { BookOpen, Crown, Download, TrendingUp } from "lucide-react"
+import { useSession } from "next-auth/react"
 import Link from "next/link"
-import { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useState } from "react"
 
 export default function HomePage() {
   // Add page-specific metadata
   const pageTitle = "CodeCraft - Master DSA & Coding Skills | Advanced Algorithm Practice Platform"
   const pageDescription = "Master Data Structures and Algorithms with CodeCraft. Track your coding progress, take detailed notes, and prepare for technical interviews with our comprehensive DSA learning platform."
   const { toast } = useToast()
+  const { data: session } = useSession()
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  
   const [filters, setFilters] = useState<QuestionFilters>({
     search: "",
     difficulty: undefined,
@@ -44,6 +50,24 @@ export default function HomePage() {
     setSelectedQuestion(null)
   }
 
+  // Check URL parameters and redirect non-authenticated users from page > 1
+  useEffect(() => {
+    const page = searchParams.get('page')
+    if (page && !session?.user && parseInt(page) > 1) {
+      // Remove the page parameter and redirect to page 1
+      const newParams = new URLSearchParams(searchParams)
+      newParams.delete('page')
+      const newUrl = newParams.toString() ? `?${newParams.toString()}` : ''
+      router.replace(newUrl)
+      
+      toast({
+        title: "Page access restricted",
+        description: "Please sign in to access more pages",
+        variant: "destructive",
+      })
+    }
+  }, [searchParams, session, router, toast])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
@@ -59,7 +83,9 @@ export default function HomePage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setIsExportDialogOpen(true)}
+                disabled={!session?.user}
                 className="hidden sm:flex items-center gap-2"
+                title={!session?.user ? "Sign in to export notes" : ""}
               >
                 <Download className="h-4 w-4" />
                 Export

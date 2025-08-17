@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 import type { Question, QuestionFilters, SortOptions } from "@/lib/types"
-import { CheckCircle, ChevronLeft, ChevronRight, Circle, ExternalLink, FileText } from "lucide-react"
+import { CheckCircle, ChevronLeft, ChevronRight, Circle, ExternalLink, FileText, Lock } from "lucide-react"
+import { useSession } from "next-auth/react"
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { CompanyTags } from "./company-tags"
 import { TopicTags } from "./topic-tags"
@@ -26,6 +28,7 @@ interface QuestionWithStatus extends Question {
 
 export function QuestionsTable({ filters, sortOptions, onNotesClick }: QuestionsTableProps) {
   const { toast } = useToast()
+  const { data: session } = useSession()
   const [questions, setQuestions] = useState<QuestionWithStatus[]>([])
   const [loading, setLoading] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
@@ -33,10 +36,19 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
   const [pageSize, setPageSize] = useState(25)
   const [subscription, setSubscription] = useState<any>(null)
   const [premiumRequired, setPremiumRequired] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isPageRestricted, setIsPageRestricted] = useState(false)
 
   useEffect(() => {
     fetchQuestions()
   }, [filters, sortOptions, currentPage, pageSize])
+
+  // Reset to page 1 when user is not authenticated
+  useEffect(() => {
+    if (!isAuthenticated && currentPage > 1) {
+      setCurrentPage(1)
+    }
+  }, [isAuthenticated, currentPage])
 
   const fetchQuestions = async () => {
     try {
@@ -60,6 +72,13 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
         setTotalCount(data.totalCount || 0)
         setSubscription(data.subscription || null)
         setPremiumRequired(data.premiumRequired || false)
+        setIsAuthenticated(data.isAuthenticated || false)
+        setIsPageRestricted(data.isPageRestricted || false)
+        
+        // If page is restricted, reset to page 1
+        if (data.isPageRestricted) {
+          setCurrentPage(1)
+        }
       } else {
         throw new Error("Failed to fetch questions")
       }
@@ -88,6 +107,15 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
   }
 
   const handlePageSizeChange = (newPageSize: number) => {
+    // Restrict non-authenticated users to reasonable page sizes
+    if (!isAuthenticated && newPageSize > 25) {
+      toast({
+        title: "Page size restricted",
+        description: "Sign in to access larger page sizes",
+        variant: "destructive",
+      })
+      return
+    }
     setPageSize(newPageSize)
     setCurrentPage(1)
   }
@@ -173,6 +201,37 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
         />
       )}
 
+      {/* Sign In Prompt for Non-Authenticated Users */}
+      {!isAuthenticated && (
+        <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                  <Lock className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                  Sign in to access more questions
+                </h3>
+                <p className="text-blue-700 dark:text-blue-300 text-sm mb-3">
+                  You're currently viewing page 1 of {totalCount} questions. Sign in to access all pages and track your progress.
+                </p>
+                <div className="flex items-center gap-3">
+                  <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
+                    <Link href="/auth/signin">Sign In</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/auth/signup">Sign Up</Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Questions Table */}
       <Card>
         <CardHeader>
@@ -195,10 +254,19 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
+                  {isAuthenticated && (
+                    <>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
+              {!isAuthenticated && (
+                <span className="text-xs text-muted-foreground">
+                  Sign in for more options
+                </span>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -234,7 +302,9 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
                           variant="ghost"
                           size="sm"
                           onClick={() => updateProgress(question.id, question.status === "DONE" ? "NOT_DONE" : "DONE")}
+                          disabled={!isAuthenticated}
                           className="p-0 h-auto"
+                          title={!isAuthenticated ? "Sign in to track progress" : ""}
                         >
                           {question.status === "DONE" ? (
                             <CheckCircle className="h-5 w-5 text-green-600" />
@@ -280,6 +350,8 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
                           variant="outline"
                           size="sm"
                           onClick={() => onNotesClick(question)}
+                          disabled={!isAuthenticated}
+                          title={!isAuthenticated ? "Sign in to add notes" : ""}
                         >
                           <FileText className="h-4 w-4 mr-2" />
                           Notes
@@ -297,6 +369,11 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
             <div className="flex items-center justify-between mt-4">
               <div className="text-sm text-muted-foreground">
                 Page {currentPage} of {totalPages}
+                {!isAuthenticated && (
+                  <span className="ml-2 text-blue-600 dark:text-blue-400">
+                    (Sign in to access all pages)
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -312,7 +389,8 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
+                  disabled={currentPage === totalPages || !isAuthenticated}
+                  title={!isAuthenticated ? "Sign in to access more pages" : ""}
                 >
                   Next
                   <ChevronRight className="h-4 w-4" />
