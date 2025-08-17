@@ -12,12 +12,9 @@ import { BookOpen, Crown, Download, TrendingUp } from "lucide-react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 
-export default function HomePage() {
-  // Add page-specific metadata
-  const pageTitle = "CodeCraft - Master DSA & Coding Skills | Advanced Algorithm Practice Platform"
-  const pageDescription = "Master Data Structures and Algorithms with CodeCraft. Track your coding progress, take detailed notes, and prepare for technical interviews with our comprehensive DSA learning platform."
+function HomePageContent() {
   const { toast } = useToast()
   const { data: session } = useSession()
   const searchParams = useSearchParams()
@@ -154,5 +151,20 @@ export default function HomePage() {
       {/* Export Dialog */}
       <ExportDialog isOpen={isExportDialogOpen} onClose={() => setIsExportDialogOpen(false)} />
     </div>
+  )
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading CodeCraft...</p>
+        </div>
+      </div>
+    }>
+      <HomePageContent />
+    </Suspense>
   )
 }
