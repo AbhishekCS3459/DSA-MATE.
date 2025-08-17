@@ -8,7 +8,8 @@ import { QuestionsTable } from "@/components/questions/questions-table"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import type { Question, QuestionFilters, SortOptions } from "@/lib/types"
-import { BookOpen, Download, TrendingUp } from "lucide-react"
+import { BookOpen, Crown, Download, TrendingUp } from "lucide-react"
+import Link from "next/link"
 import { useState } from "react"
 
 export default function HomePage() {
@@ -62,6 +63,17 @@ export default function HomePage() {
               >
                 <Download className="h-4 w-4" />
                 Export
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                asChild
+                className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              >
+                <Link href="/premium">
+                  <Crown className="h-4 w-4" />
+                  Go Premium
+                </Link>
               </Button>
               <UserNav />
             </div>

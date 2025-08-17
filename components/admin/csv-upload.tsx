@@ -430,6 +430,9 @@ export function CSVUpload() {
                   <p className="text-sm text-blue-700 dark:text-blue-300">
                     <strong>Important:</strong> Title and difficulty are required. For optional fields, use undefined/null instead of empty strings.
                   </p>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    <strong>Topics & Companies:</strong> Use simple comma-separated values without quotes or brackets. Example: "Array, Hash Table, Two Pointers"
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -514,7 +517,7 @@ export function CSVUpload() {
                 </label>
                 <Textarea
                   id="csv-content"
-                  placeholder="title,difficulty,frequency,acceptanceRate,link,topics,companies&#10;Two Sum,EASY,95,49.2,https://leetcode.com/problems/two-sum/,Array Hash Table,Google Amazon Microsoft"
+                  placeholder="title,difficulty,frequency,acceptanceRate,link,topics,companies&#10;Two Sum,EASY,95,49.2,https://leetcode.com/problems/two-sum/,Array Hash Table Two Pointers,Google Amazon Microsoft"
                   value={csvContent}
                   onChange={(e) => setCsvContent(e.target.value)}
                   className="min-h-[200px] font-mono text-sm"
@@ -654,9 +657,12 @@ export function CSVUpload() {
         <CardContent>
           <pre className="text-xs bg-muted p-3 rounded-md overflow-x-auto">
             {`title,difficulty,frequency,acceptanceRate,link,topics,companies
-Two Sum,EASY,95,49.2,https://leetcode.com/problems/two-sum/,"Array,Hash Table","Google,Amazon,Microsoft"
-Add Two Numbers,MEDIUM,85,38.1,https://leetcode.com/problems/add-two-numbers/,"Linked List,Math,Recursion","Amazon,Microsoft,Apple"`}
+Two Sum,EASY,95,49.2,https://leetcode.com/problems/two-sum/,Array Hash Table Two Pointers,Google Amazon Microsoft
+Add Two Numbers,MEDIUM,85,38.1,https://leetcode.com/problems/add-two-numbers/,Linked List Math Recursion,Amazon Microsoft Apple`}
           </pre>
+          <p className="text-xs text-muted-foreground mt-2">
+            <strong>Note:</strong> Topics and companies should be space-separated (not comma-separated) to avoid CSV parsing issues.
+          </p>
         </CardContent>
       </Card>
 

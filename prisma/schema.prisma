@@ -41,20 +41,55 @@ model Session {
 }
 
 model User {
-  id        String         @id @default(cuid())
-  email     String         @unique
-  name      String?
-  image     String?
-  password  String?
-  role      Role           @default(USER)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-  notes     UserNotes[]
-  progress  UserProgress[]
-  accounts  Account[]
-  sessions  Session[]
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          Role      @default(USER)
+  accounts      Account[]
+  sessions      Session[]
+  progress      UserProgress[]
+  notes         UserNotes[]
+  subscription  Subscription?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@map("users")
+}
+
+model Subscription {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan          String   // FREE, STUDENT, PROFESSIONAL
+  status        String   // ACTIVE, INACTIVE, CANCELLED
+  startDate     DateTime
+  endDate       DateTime
+  paymentMethod String?
+  amount        Float
+  currency      String   @default("INR")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+model PremiumPlan {
+  id           String   @id @default(cuid())
+  name         String
+  price        Float
+  currency     String   @default("INR")
+  billingCycle String   // MONTHLY, YEARLY
+  features     String[]
+  maxQuestions Int
+  description  String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("premium_plans")
 }
 
 model VerificationToken {

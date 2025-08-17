@@ -41,6 +41,7 @@ function cleanAndDeduplicateArray(arr: string[]): string[] {
     return []
   }
   
+  // First, flatten the array and clean each item
   const cleaned = arr
     .map(item => {
       if (typeof item !== 'string') {
@@ -70,6 +71,8 @@ function cleanAndDeduplicateArray(arr: string[]): string[] {
     })
     .filter((item): item is string | string[] => item !== null) // Remove null values and type guard
     .flat() // Flatten any nested arrays from JSON parsing
+    .map(item => String(item).trim()) // Ensure all items are strings and trimmed
+    .filter(item => item.length > 0) // Remove empty strings
     .filter((item, index, array) => array.indexOf(item) === index) // Remove duplicates
     .sort() // Sort alphabetically for consistency
   
@@ -154,13 +157,24 @@ export async function POST(request: NextRequest) {
           results.errors.push(`Row ${i + 1}: Companies cannot be empty string (use undefined/null for no companies)`)
           continue
         }
+        
+        // Early validation for malformed CSV data
+        if (row.topics && (row.topics.includes('"') || row.topics.includes('[') || row.topics.includes(']') || row.topics.includes(','))) {
+          results.errors.push(`Row ${i + 1}: Topics field contains invalid characters. Please ensure topics are space-separated without quotes, brackets, or commas.`)
+          continue
+        }
+        
+        if (row.companies && (row.companies.includes('"') || row.companies.includes('[') || row.companies.includes(']') || row.companies.includes(','))) {
+          results.errors.push(`Row ${i + 1}: Companies field contains invalid characters. Please ensure companies are space-separated without quotes, brackets, or commas.`)
+          continue
+        }
 
         // Parse topics and companies with proper deduplication
         const topics = row.topics
-          ? cleanAndDeduplicateArray(row.topics.split(","))
+          ? cleanAndDeduplicateArray(row.topics.split(/\s+/).map(t => t.trim()))
           : []
         const companies = row.companies
-          ? cleanAndDeduplicateArray(row.companies.split(","))
+          ? cleanAndDeduplicateArray(row.companies.split(/\s+/).map(t => t.trim()))
           : []
 
         // Check if question already exists
@@ -188,6 +202,17 @@ export async function POST(request: NextRequest) {
           // Merge topics and companies with proper deduplication
           const mergedTopics = cleanAndDeduplicateArray([...existingQuestion.topics, ...topics])
           const mergedCompanies = cleanAndDeduplicateArray([...existingQuestion.companies, ...companies])
+          
+          // Additional validation to ensure no malformed arrays
+          if (mergedTopics.some(topic => topic.includes(',') || topic.includes('"'))) {
+            results.errors.push(`Row ${i + 1}: Invalid topic format detected after merging`)
+            continue
+          }
+          
+          if (mergedCompanies.some(company => company.includes(',') || company.includes('"'))) {
+            results.errors.push(`Row ${i + 1}: Invalid company format detected after merging`)
+            continue
+          }
 
           const frequency = row.frequency ? Number.parseInt(row.frequency) : existingQuestion.frequency
           const calculatedAcceptanceRate = calculateAcceptanceRate(frequency, row.acceptanceRate || null)
@@ -233,6 +258,17 @@ export async function POST(request: NextRequest) {
           // Create new question
           const frequency = row.frequency ? Number.parseInt(row.frequency) : null
           const calculatedAcceptanceRate = calculateAcceptanceRate(frequency, row.acceptanceRate || null)
+          
+          // Validate topics and companies format for new questions
+          if (topics.some(topic => topic.includes(',') || topic.includes('"'))) {
+            results.errors.push(`Row ${i + 1}: Invalid topic format detected`)
+            continue
+          }
+          
+          if (companies.some(company => company.includes(',') || company.includes('"'))) {
+            results.errors.push(`Row ${i + 1}: Invalid company format detected`)
+            continue
+          }
           
           const newQuestion = await prisma.question.create({
             data: {

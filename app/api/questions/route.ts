@@ -30,6 +30,31 @@ export async function GET(request: NextRequest) {
     const page = Number.parseInt(searchParams.get("page") || "1")
     const limit = Number.parseInt(searchParams.get("limit") || "50")
 
+    // Check user subscription status
+    let maxQuestions = 100 // Default for free users
+    let canAccessAll = false
+    let subscriptionStatus = null
+    
+    if (session?.user) {
+      try {
+        const subscriptionResponse = await fetch(`${request.nextUrl.origin}/api/premium/status`, {
+          headers: {
+            'Cookie': request.headers.get('cookie') || '',
+          },
+        })
+        
+        if (subscriptionResponse.ok) {
+          const subscriptionData = await subscriptionResponse.json()
+          maxQuestions = subscriptionData.subscription.maxQuestions
+          canAccessAll = subscriptionData.subscription.canAccessAll
+          subscriptionStatus = subscriptionData.subscription
+        }
+      } catch (error) {
+        console.error("Error checking subscription status:", error)
+        // Continue with free user limits
+      }
+    }
+
     // Check if request is cacheable
     const isCacheable = !search && !status && page === 1 && limit <= 100
     const userId = (session?.user as any)?.id
@@ -150,6 +175,18 @@ export async function GET(request: NextRequest) {
       totalCount = filteredQuestions.length
     }
 
+    // Apply premium restrictions for free users
+    if (!canAccessAll && totalCount > maxQuestions) {
+      totalCount = maxQuestions
+      
+      // If this page would exceed the limit, adjust the results
+      if ((page - 1) * limit >= maxQuestions) {
+        filteredQuestions = []
+      } else if (page * limit > maxQuestions) {
+        filteredQuestions = filteredQuestions.slice(0, maxQuestions - (page - 1) * limit)
+      }
+    }
+
     // Get unique topics and companies for filter options (with caching)
     let allTopics: string[] = []
     let allCompanies: string[] = []
@@ -226,6 +263,8 @@ export async function GET(request: NextRequest) {
         topics: allTopics,
         companies: allCompanies,
       },
+      subscription: subscriptionStatus,
+      premiumRequired: !canAccessAll && totalCount > maxQuestions,
     }
 
     // Cache the response data if cacheable

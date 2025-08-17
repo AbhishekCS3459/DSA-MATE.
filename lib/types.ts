@@ -46,8 +46,34 @@ export interface User {
   name?: string
   image?: string
   role: "USER" | "ADMIN"
+  subscription?: Subscription
   createdAt: Date
   updatedAt: Date
+}
+
+export interface Subscription {
+  id: string
+  userId: string
+  plan: "FREE" | "STUDENT" | "PROFESSIONAL"
+  status: "ACTIVE" | "INACTIVE" | "CANCELLED"
+  startDate: Date
+  endDate: Date
+  paymentMethod?: string
+  amount: number
+  currency: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface PremiumPlan {
+  id: string
+  name: string
+  price: number
+  currency: string
+  billingCycle: "MONTHLY" | "YEARLY"
+  features: string[]
+  maxQuestions: number
+  description: string
 }
 
 // Filter and search types
