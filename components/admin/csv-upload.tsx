@@ -39,6 +39,8 @@ export function CSVUpload() {
   const [activeTab, setActiveTab] = useState("upload")
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([])
   const [showValidationPopup, setShowValidationPopup] = useState(false)
+  const [processingProgress, setProcessingProgress] = useState(0)
+  const [processingStep, setProcessingStep] = useState("")
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
@@ -152,18 +154,41 @@ export function CSVUpload() {
 
     setUploading(true)
     setUploadResult(null)
+    setProcessingProgress(0)
+    setProcessingStep("Preparing file for upload...")
 
     try {
+      // Simulate processing steps
+      setProcessingProgress(20)
+      setProcessingStep("Validating CSV format...")
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      setProcessingProgress(40)
+      setProcessingStep("Creating form data...")
+      await new Promise(resolve => setTimeout(resolve, 300))
+
       const formData = new FormData()
       formData.append("file", selectedFile)
+
+      setProcessingProgress(60)
+      setProcessingStep("Uploading to server...")
+      await new Promise(resolve => setTimeout(resolve, 200))
 
       const response = await fetch("/api/admin/upload", {
         method: "POST",
         body: formData,
       })
 
+      setProcessingProgress(80)
+      setProcessingStep("Processing response...")
+      await new Promise(resolve => setTimeout(resolve, 300))
+
       const result = await response.json()
       setUploadResult(result)
+      
+      setProcessingProgress(100)
+      setProcessingStep("Upload complete!")
+      await new Promise(resolve => setTimeout(resolve, 500))
       
       if (result.success) {
         toast({
@@ -190,6 +215,8 @@ export function CSVUpload() {
       })
     } finally {
       setUploading(false)
+      setProcessingProgress(0)
+      setProcessingStep("")
     }
   }
 
@@ -271,22 +298,49 @@ export function CSVUpload() {
 
       setUploading(true)
       setUploadResult(null)
+      setProcessingProgress(0)
+      setProcessingStep("Preparing pasted content...")
 
       try {
+        // Simulate processing steps
+        setProcessingProgress(20)
+        setProcessingStep("Validating CSV format...")
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        setProcessingProgress(40)
+        setProcessingStep("Creating file from content...")
+        await new Promise(resolve => setTimeout(resolve, 300))
+
         // Create a CSV file from the pasted content
         const blob = new Blob([csvContent], { type: "text/csv" })
         const file = new File([blob], "pasted-data.csv", { type: "text/csv" })
         
+        setProcessingProgress(60)
+        setProcessingStep("Preparing form data...")
+        await new Promise(resolve => setTimeout(resolve, 200))
+
         const formData = new FormData()
         formData.append("file", file)
+
+        setProcessingProgress(70)
+        setProcessingStep("Uploading to server...")
+        await new Promise(resolve => setTimeout(resolve, 300))
 
         const response = await fetch("/api/admin/upload", {
           method: "POST",
           body: formData,
         })
 
+        setProcessingProgress(85)
+        setProcessingStep("Processing response...")
+        await new Promise(resolve => setTimeout(resolve, 300))
+
         const result = await response.json()
         setUploadResult(result)
+        
+        setProcessingProgress(100)
+        setProcessingStep("Upload complete!")
+        await new Promise(resolve => setTimeout(resolve, 500))
         
         if (result.success) {
           toast({
@@ -313,6 +367,8 @@ export function CSVUpload() {
         })
       } finally {
         setUploading(false)
+        setProcessingProgress(0)
+        setProcessingStep("")
       }
     } catch (error) {
       setValidationErrors([
@@ -330,12 +386,16 @@ export function CSVUpload() {
     setCsvContent("")
     setUploadResult(null)
     setValidationErrors([])
+    setProcessingProgress(0)
+    setProcessingStep("")
   }
 
   const clearFile = () => {
     setSelectedFile(null)
     setUploadResult(null)
     setValidationErrors([])
+    setProcessingProgress(0)
+    setProcessingStep("")
   }
 
   const closeValidationPopup = () => {
@@ -430,7 +490,14 @@ export function CSVUpload() {
               {selectedFile && (
                 <div className="flex items-center gap-2">
                   <Button onClick={handleFileUpload} disabled={uploading} className="flex-1">
-                    {uploading ? "Uploading..." : "Upload CSV"}
+                    {uploading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                        Processing...
+                      </div>
+                    ) : (
+                      "Upload CSV"
+                    )}
                   </Button>
                   <Button variant="outline" onClick={clearFile} disabled={uploading}>
                     Clear
@@ -458,7 +525,14 @@ export function CSVUpload() {
               {csvContent.trim() && (
                 <div className="flex items-center gap-2">
                   <Button onClick={handlePasteUpload} disabled={uploading} className="flex-1">
-                    {uploading ? "Processing..." : "Process CSV"}
+                    {uploading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                        Processing...
+                      </div>
+                    ) : (
+                      "Process CSV"
+                    )}
                   </Button>
                   <Button variant="outline" onClick={clearPaste} disabled={uploading}>
                     Clear
@@ -470,12 +544,40 @@ export function CSVUpload() {
 
           {/* Upload Progress */}
           {uploading && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>Processing CSV...</span>
-                <span>Please wait</span>
-              </div>
-              <Progress value={undefined} className="w-full" />
+            <div className="space-y-4">
+              <Card className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20">
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                      <div className="flex-1">
+                        <p className="font-medium text-blue-900 dark:text-blue-100">
+                          {processingStep}
+                        </p>
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          Please wait while we process your CSV file...
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-blue-700 dark:text-blue-300">Progress</span>
+                        <span className="text-blue-700 dark:text-blue-300 font-medium">
+                          {processingProgress}%
+                        </span>
+                      </div>
+                      <Progress 
+                        value={processingProgress} 
+                        className="w-full h-2" 
+                        style={{
+                          '--progress-background': 'hsl(var(--blue-500))',
+                        } as React.CSSProperties}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
