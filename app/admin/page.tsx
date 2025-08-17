@@ -1,11 +1,12 @@
 import { CacheManagement } from "@/components/admin/cache-management"
 import { ChangeLog } from "@/components/admin/change-log"
 import { CSVUpload } from "@/components/admin/csv-upload"
+import { QuestionsManagement } from "@/components/admin/questions-management"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { authOptions } from "@/lib/auth"
-import { ArrowLeft, BarChart3, Database, FileText, Shield, Upload } from "lucide-react"
+import { ArrowLeft, BarChart3, Database, Edit2, FileText, Shield, Upload } from "lucide-react"
 import { getServerSession } from "next-auth"
 import Link from "next/link"
 import { redirect } from "next/navigation"
@@ -41,8 +42,12 @@ export default async function AdminPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="upload" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="questions" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="questions" className="flex items-center gap-2">
+              <Edit2 className="h-4 w-4" />
+              Questions
+            </TabsTrigger>
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               CSV Upload
@@ -60,6 +65,10 @@ export default async function AdminPage() {
               Statistics
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="questions">
+            <QuestionsManagement />
+          </TabsContent>
 
           <TabsContent value="upload">
             <CSVUpload />
