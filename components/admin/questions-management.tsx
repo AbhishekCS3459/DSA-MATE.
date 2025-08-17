@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Edit2, ExternalLink, Save, Search, Shield, Trash2, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Edit2, ExternalLink, Save, Search, Shield, Trash2, X } from "lucide-react"
 import { useEffect, useState } from "react"
 
 interface Question {
@@ -29,6 +29,15 @@ interface EditableQuestion extends Omit<Question, 'topics' | 'companies'> {
   companies: string
 }
 
+interface PaginationInfo {
+  currentPage: number
+  totalPages: number
+  totalCount: number
+  hasNextPage: boolean
+  hasPrevPage: boolean
+  limit: number
+}
+
 export function QuestionsManagement() {
   const { toast } = useToast()
   const [questions, setQuestions] = useState<Question[]>([])
@@ -38,7 +47,12 @@ export function QuestionsManagement() {
   const [searchTerm, setSearchTerm] = useState("")
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [filterDifficulty, setFilterDifficulty] = useState<string>("all")
-  const [isAdmin, setIsAdmin] = useState(false) // This should be set based on user role
+  const [isAdmin, setIsAdmin] = useState(false)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [paginationInfo, setPaginationInfo] = useState<PaginationInfo | null>(null)
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
 
   // Check if user is admin using session
   useEffect(() => {
@@ -47,18 +61,36 @@ export function QuestionsManagement() {
     setIsAdmin(true)
   }, [])
 
-  // Fetch questions on component mount
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setCurrentPage(1) // Reset to first page when searching
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Fetch questions when pagination, search, or filters change
   useEffect(() => {
     fetchQuestions()
-  }, [])
+  }, [currentPage, debouncedSearchTerm, filterDifficulty])
 
   const fetchQuestions = async () => {
     try {
       setLoading(true)
-      const response = await fetch("/api/admin/questions")
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: "25",
+        search: debouncedSearchTerm,
+        difficulty: filterDifficulty
+      })
+      
+      const response = await fetch(`/api/admin/questions?${params}`)
       if (response.ok) {
         const data = await response.json()
         setQuestions(data.questions || [])
+        setPaginationInfo(data.pagination || null)
       } else {
         throw new Error("Failed to fetch questions")
       }
@@ -126,31 +158,41 @@ export function QuestionsManagement() {
       })
 
       if (response.ok) {
-        const updatedQuestion = await response.json()
+        const result = await response.json()
         
-        // Update local state
-        setQuestions(prev => 
-          prev.map(q => 
-            q.id === editingData.id 
-              ? { ...updatedQuestion, topics: updateData.topics, companies: updateData.companies }
-              : q
+        if (result.success && result.question) {
+          // Update local state with the returned question data
+          setQuestions(prev => 
+            prev.map(q => 
+              q.id === editingData.id 
+                ? { ...result.question, topics: updateData.topics, companies: updateData.companies }
+                : q
+            )
           )
-        )
 
-        toast({
-          title: "Success",
-          description: "Question updated successfully",
-        })
+          toast({
+            title: "Success",
+            description: "Question updated successfully",
+          })
 
-        setEditingId(null)
-        setEditingData(null)
+          // Clear editing state
+          setEditingId(null)
+          setEditingData(null)
+          
+          // Refresh the current page to ensure data consistency
+          fetchQuestions()
+        } else {
+          throw new Error("Invalid response format from server")
+        }
       } else {
-        throw new Error("Failed to update question")
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
     } catch (error) {
+      console.error("Error saving question:", error)
       toast({
         title: "Error",
-        description: "Failed to update question",
+        description: error instanceof Error ? error.message : "Failed to update question",
         variant: "destructive",
       })
     }
@@ -169,6 +211,9 @@ export function QuestionsManagement() {
           description: "Question deleted successfully",
         })
         setDeleteConfirmId(null)
+        
+        // Refresh questions to update pagination
+        fetchQuestions()
       } else {
         throw new Error("Failed to delete question")
       }
@@ -194,13 +239,11 @@ export function QuestionsManagement() {
     }
   }
 
-  // Filter questions based on search and difficulty
-  const filteredQuestions = questions.filter(question => {
-    const matchesSearch = question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         question.topics.some(topic => topic.toLowerCase().includes(searchTerm.toLowerCase()))
-    const matchesDifficulty = filterDifficulty === "all" || question.difficulty === filterDifficulty
-    return matchesSearch && matchesDifficulty
-  })
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage)
+    // Scroll to top when changing pages
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   if (loading) {
     return (
@@ -245,7 +288,10 @@ export function QuestionsManagement() {
                 className="pl-10"
               />
             </div>
-            <Select value={filterDifficulty} onValueChange={setFilterDifficulty}>
+            <Select value={filterDifficulty} onValueChange={(value) => {
+              setFilterDifficulty(value)
+              setCurrentPage(1) // Reset to first page when filtering
+            }}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Filter by difficulty" />
               </SelectTrigger>
@@ -274,14 +320,14 @@ export function QuestionsManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredQuestions.length === 0 ? (
+                {questions.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-8 text-muted-foreground">
                       No questions found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredQuestions.map((question) => (
+                  questions.map((question) => (
                     <TableRow key={question.id}>
                       {/* Title - Editable for everyone */}
                       <TableCell className="font-medium">
@@ -514,10 +560,68 @@ export function QuestionsManagement() {
             </Table>
           </div>
 
+          {/* Pagination Controls */}
+          {paginationInfo && paginationInfo.totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Showing {((paginationInfo.currentPage - 1) * paginationInfo.limit) + 1} to {Math.min(paginationInfo.currentPage * paginationInfo.limit, paginationInfo.totalCount)} of {paginationInfo.totalCount} questions
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(paginationInfo.currentPage - 1)}
+                  disabled={!paginationInfo.hasPrevPage}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, paginationInfo.totalPages) }, (_, i) => {
+                    let pageNum: number
+                    if (paginationInfo.totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (paginationInfo.currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (paginationInfo.currentPage >= paginationInfo.totalPages - 2) {
+                      pageNum = paginationInfo.totalPages - 4 + i
+                    } else {
+                      pageNum = paginationInfo.currentPage - 2 + i
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={paginationInfo.currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(pageNum)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(paginationInfo.currentPage + 1)}
+                  disabled={!paginationInfo.hasNextPage}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Summary */}
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>
-              Showing {filteredQuestions.length} of {questions.length} questions
+              Page {paginationInfo?.currentPage || 1} of {paginationInfo?.totalPages || 1} • {paginationInfo?.totalCount || 0} total questions
             </span>
             <div className="flex items-center gap-4">
               <span>

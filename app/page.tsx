@@ -12,6 +12,9 @@ import { BookOpen, Download, TrendingUp } from "lucide-react"
 import { useState } from "react"
 
 export default function HomePage() {
+  // Add page-specific metadata
+  const pageTitle = "CodeCraft - Master DSA & Coding Skills | Advanced Algorithm Practice Platform"
+  const pageDescription = "Master Data Structures and Algorithms with CodeCraft. Track your coding progress, take detailed notes, and prepare for technical interviews with our comprehensive DSA learning platform."
   const { toast } = useToast()
   const [filters, setFilters] = useState<QuestionFilters>({
     search: "",
@@ -47,7 +50,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <h1 className="text-3xl font-serif font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                DSA Mate
+                CodeCraft
               </h1>
             </div>
             <div className="flex items-center gap-3">

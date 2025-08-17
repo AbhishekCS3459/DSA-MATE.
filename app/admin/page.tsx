@@ -12,6 +12,9 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 export default async function AdminPage() {
+  // Add page-specific metadata
+  const pageTitle = "CodeCraft Admin Panel - Manage DSA Questions & Users"
+  const pageDescription = "Admin panel for CodeCraft platform. Manage DSA questions, user accounts, system cache, and monitor platform performance."
   const session = await getServerSession(authOptions)
 
   if (!(session?.user as any)?.id || (session?.user as any)?.role !== "ADMIN") {

@@ -225,16 +225,6 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
           Refresh Filters
         </Button>
 
-        {/* Filter Data Quality Note */}
-        {(availableTopics.some(t => t.includes('"') || t.includes("'")) || 
-          availableTopics.includes('undefined') || 
-          availableTopics.length === 0) && (
-          <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 rounded-md border border-amber-200 dark:border-amber-800">
-            <p className="font-medium mb-1">⚠️ Filter data needs cleanup</p>
-            <p>Some topics may have formatting issues. Use the "Refresh Filters" button or contact an admin to clean up the data.</p>
-          </div>
-        )}
-
         {/* Topics Filter */}
         <Popover>
           <PopoverTrigger asChild>

@@ -17,6 +17,9 @@ import { redirect } from "next/navigation"
 import { useEffect, useState } from "react"
 
 export default function ProfilePage() {
+  // Add page-specific metadata
+  const pageTitle = "CodeCraft Profile - Track Your DSA Progress & Analytics"
+  const pageDescription = "Monitor your DSA learning progress with CodeCraft. View detailed analytics, track solved problems, and analyze your performance across different difficulty levels and topics."
   const { data: session, status } = useSession()
   const { toast } = useToast()
   const [stats, setStats] = useState<any>(null)

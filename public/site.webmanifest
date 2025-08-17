@@ -1,7 +1,7 @@
 {
-  "name": "DSA Mate",
-  "short_name": "DSA Mate",
-  "description": "Track your Data Structures and Algorithms practice progress",
+  "name": "CodeCraft - Master DSA & Coding Skills",
+  "short_name": "CodeCraft",
+  "description": "Advanced platform for mastering Data Structures, Algorithms, and coding skills. Track progress, take notes, and prepare for technical interviews.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

@@ -14,7 +14,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized - Admin access required" }, { status: 403 })
     }
 
+    // Get pagination parameters from query string
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '25')
+    const search = searchParams.get('search') || ''
+    const role = searchParams.get('role') || ''
+
+    // Calculate skip value for pagination
+    const skip = (page - 1) * limit
+
+    // Build where clause for filtering
+    const where: any = {}
+    
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search, mode: 'insensitive' } }
+      ]
+    }
+    
+    if (role && role !== 'all') {
+      where.role = role
+    }
+
+    // Get total count for pagination
+    const totalCount = await prisma.user.count({ where })
+
+    // Get users with pagination and filtering
     const users = await prisma.user.findMany({
+      where,
       select: {
         id: true,
         email: true,
@@ -26,11 +55,26 @@ export async function GET(request: NextRequest) {
       orderBy: {
         createdAt: "desc",
       },
+      skip,
+      take: limit,
     })
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalCount / limit)
+    const hasNextPage = page < totalPages
+    const hasPrevPage = page > 1
 
     return NextResponse.json({
       success: true,
       users,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage,
+        hasPrevPage,
+        limit
+      }
     })
   } catch (error) {
     console.error("Error fetching users:", error)

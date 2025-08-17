@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { Save, Search, Shield, User, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Save, Search, Shield, User, X } from "lucide-react"
 import { useEffect, useState } from "react"
 
 interface User {
@@ -24,6 +24,15 @@ interface EditableUser extends Omit<User, 'createdAt' | 'updatedAt'> {
   updatedAt: string
 }
 
+interface PaginationInfo {
+  currentPage: number
+  totalPages: number
+  totalCount: number
+  hasNextPage: boolean
+  hasPrevPage: boolean
+  limit: number
+}
+
 export function UserManagement() {
   const { toast } = useToast()
   const [users, setUsers] = useState<User[]>([])
@@ -32,19 +41,42 @@ export function UserManagement() {
   const [editingData, setEditingData] = useState<EditableUser | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("all")
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [paginationInfo, setPaginationInfo] = useState<PaginationInfo | null>(null)
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
 
-  // Fetch users on component mount
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setCurrentPage(1) // Reset to first page when searching
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Fetch users when pagination, search, or filters change
   useEffect(() => {
     fetchUsers()
-  }, [])
+  }, [currentPage, debouncedSearchTerm, roleFilter])
 
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      const response = await fetch("/api/admin/users")
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: "25",
+        search: debouncedSearchTerm,
+        role: roleFilter
+      })
+      
+      const response = await fetch(`/api/admin/users?${params}`)
       if (response.ok) {
         const data = await response.json()
         setUsers(data.users || [])
+        setPaginationInfo(data.pagination || null)
       } else {
         throw new Error("Failed to fetch users")
       }
@@ -86,22 +118,34 @@ export function UserManagement() {
       })
 
       if (response.ok) {
-        const updatedUser = await response.json()
-        setUsers((prev) =>
-          prev.map((user) =>
-            user.id === editingData.id ? { ...user, ...updatedUser.user } : user
+        const result = await response.json()
+        
+        if (result.success && result.user) {
+          // Update local state with the returned user data
+          setUsers((prev) =>
+            prev.map((user) =>
+              user.id === editingData.id ? { ...user, ...result.user } : user
+            )
           )
-        )
-        toast({
-          title: "Success",
-          description: "User role updated successfully",
-        })
-        cancelEditing()
+          
+          toast({
+            title: "Success",
+            description: "User role updated successfully",
+          })
+          
+          cancelEditing()
+          
+          // Refresh the current page to ensure data consistency
+          fetchUsers()
+        } else {
+          throw new Error("Invalid response format from server")
+        }
       } else {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to update user")
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
     } catch (error) {
+      console.error("Error updating user:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update user",
@@ -132,12 +176,11 @@ export function UserManagement() {
     }
   }
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    const matchesRole = roleFilter === "all" || user.role === roleFilter
-    return matchesSearch && matchesRole
-  })
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage)
+    // Scroll to top when changing pages
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   if (loading) {
     return (
@@ -179,7 +222,10 @@ export function UserManagement() {
                 className="pl-10"
               />
             </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <Select value={roleFilter} onValueChange={(value) => {
+              setRoleFilter(value)
+              setCurrentPage(1) // Reset to first page when filtering
+            }}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Filter by role" />
               </SelectTrigger>
@@ -192,7 +238,7 @@ export function UserManagement() {
           </div>
 
           {/* Users Table */}
-          <div className="border rounded-lg">
+          <div className="border rounded-lg overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -203,77 +249,148 @@ export function UserManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{user.name || "No name"}</div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {editingId === user.id ? (
-                        <Select
-                          value={editingData?.role || user.role}
-                          onValueChange={(value: "USER" | "ADMIN") =>
-                            setEditingData((prev) => prev ? { ...prev, role: value } : null)
-                          }
-                        >
-                          <SelectTrigger className="w-[120px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="USER">User</SelectItem>
-                            <SelectItem value="ADMIN">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Badge className={getRoleColor(user.role)}>
-                          <div className="flex items-center gap-1">
-                            {getRoleIcon(user.role)}
-                            {user.role}
-                          </div>
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-muted-foreground">
-                        {new Date(user.createdAt).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {editingId === user.id ? (
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" onClick={saveUser}>
-                            <Save className="h-4 w-4 mr-1" />
-                            Save
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={cancelEditing}>
-                            <X className="h-4 w-4 mr-1" />
-                            Cancel
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button size="sm" variant="outline" onClick={() => startEditing(user)}>
-                          Edit Role
-                        </Button>
-                      )}
+                {users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      {searchTerm || roleFilter !== "all" 
+                        ? "No users found matching your criteria" 
+                        : "No users found"}
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{user.name || "No name"}</div>
+                          <div className="text-sm text-muted-foreground">{user.email}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {editingId === user.id ? (
+                          <Select
+                            value={editingData?.role || user.role}
+                            onValueChange={(value: "USER" | "ADMIN") =>
+                              setEditingData((prev) => prev ? { ...prev, role: value } : null)
+                            }
+                          >
+                            <SelectTrigger className="w-[120px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="USER">User</SelectItem>
+                              <SelectItem value="ADMIN">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge className={getRoleColor(user.role)}>
+                            <div className="flex items-center gap-1">
+                              {getRoleIcon(user.role)}
+                              {user.role}
+                            </div>
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-muted-foreground">
+                          {new Date(user.createdAt).toLocaleDateString()}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {editingId === user.id ? (
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" onClick={saveUser}>
+                              <Save className="h-4 w-4 mr-1" />
+                              Save
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={cancelEditing}>
+                              <X className="h-4 w-4 mr-1" />
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={() => startEditing(user)}>
+                            Edit Role
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
 
-          {filteredUsers.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">
-                {searchTerm || roleFilter !== "all" 
-                  ? "No users found matching your criteria" 
-                  : "No users found"}
-              </p>
+          {/* Pagination Controls */}
+          {paginationInfo && paginationInfo.totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Showing {((paginationInfo.currentPage - 1) * paginationInfo.limit) + 1} to {Math.min(paginationInfo.currentPage * paginationInfo.limit, paginationInfo.totalCount)} of {paginationInfo.totalCount} users
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(paginationInfo.currentPage - 1)}
+                  disabled={!paginationInfo.hasPrevPage}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, paginationInfo.totalPages) }, (_, i) => {
+                    let pageNum: number
+                    if (paginationInfo.totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (paginationInfo.currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (paginationInfo.currentPage >= paginationInfo.totalPages - 2) {
+                      pageNum = paginationInfo.totalPages - 4 + i
+                    } else {
+                      pageNum = paginationInfo.currentPage - 2 + i
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={paginationInfo.currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(pageNum)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(paginationInfo.currentPage + 1)}
+                  disabled={!paginationInfo.hasNextPage}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
+
+          {/* Summary */}
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>
+              Page {paginationInfo?.currentPage || 1} of {paginationInfo?.totalPages || 1} • {paginationInfo?.totalCount || 0} total users
+            </span>
+            <div className="flex items-center gap-4">
+              <span>
+                {users.filter(u => u.role === "USER").length} Users • 
+                {users.filter(u => u.role === "ADMIN").length} Admins
+              </span>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

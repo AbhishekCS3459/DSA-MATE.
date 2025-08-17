@@ -2,8 +2,8 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx"
 import { jsPDF } from "jspdf"
-import { type NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
+import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
@@ -174,7 +174,7 @@ async function generatePDF(data: any, type: string): Promise<Buffer> {
 
   // Title
   doc.setFontSize(20)
-  doc.text(`DSA Mate - ${type.replace("-", " ").toUpperCase()}`, 20, yPosition)
+  doc.text(`CodeCraft - ${type.replace("-", " ").toUpperCase()}`, 20, yPosition)
   yPosition += 20
 
   // Date
@@ -264,7 +264,7 @@ async function generateDOCX(data: any, type: string): Promise<Buffer> {
     new Paragraph({
       children: [
         new TextRun({
-          text: `DSA Mate - ${type.replace("-", " ").toUpperCase()}`,
+          text: `CodeCraft - ${type.replace("-", " ").toUpperCase()}`,
           bold: true,
           size: 32,
         }),
@@ -359,6 +359,6 @@ async function generateDOCX(data: any, type: string): Promise<Buffer> {
 async function generatePPTX(data: any, type: string): Promise<Buffer> {
   // For now, return a simple text file as PPTX generation is complex
   // In a real implementation, you'd use a library like pptxgenjs
-  const content = `DSA Mate - ${type.replace("-", " ").toUpperCase()}\n\nGenerated on: ${new Date().toLocaleDateString()}\n\nPowerPoint export feature coming soon...`
+  const content = `CodeCraft - ${type.replace("-", " ").toUpperCase()}\n\nGenerated on: ${new Date().toLocaleDateString()}\n\nPowerPoint export feature coming soon...`
   return Buffer.from(content, "utf-8")
 }
