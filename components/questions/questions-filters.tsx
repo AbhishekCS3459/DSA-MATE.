@@ -49,7 +49,11 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
           .trim()
           .replace(/^["'`]+|["'`]+$/g, '') // Remove quotes from start and end
           .replace(/["'`]/g, '') // Remove any remaining quotes
+          .replace(/\s+/g, ' ') // Replace multiple spaces with single space
           .trim()
+        
+        // Skip empty or very short items
+        if (cleaned.length < 2) return null
         
         return cleaned
       })
@@ -68,6 +72,7 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
         const cleanedTopics = cleanFilterData(data.filters.topics)
         const cleanedCompanies = cleanFilterData(data.filters.companies)
         
+
         setAvailableTopics(cleanedTopics)
         setAvailableCompanies(cleanedCompanies)
       }
@@ -259,13 +264,30 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-80">
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">Select Topics</h4>
                 <span className="text-xs text-muted-foreground">
                   {availableTopics.length} available
                 </span>
               </div>
+              
+              {/* Search Topics */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search topics..."
+                  className="pl-10"
+                  onChange={(e) => {
+                    const searchTerm = e.target.value.toLowerCase()
+                    const filtered = availableTopics.filter(topic => 
+                      topic.toLowerCase().includes(searchTerm)
+                    )
+                    // You could implement a local search state here if needed
+                  }}
+                />
+              </div>
+              
               {availableTopics.length === 0 ? (
                 <div className="text-center py-4 text-sm text-muted-foreground">
                   No topics available. Try refreshing the filters.
@@ -281,9 +303,10 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
                       />
                       <label
                         htmlFor={`topic-${topic}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 min-w-0"
+                        title={topic}
                       >
-                        {topic}
+                        <span className="truncate block">{topic}</span>
                       </label>
                     </div>
                   ))}

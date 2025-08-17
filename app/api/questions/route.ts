@@ -216,9 +216,14 @@ export async function GET(request: NextRequest) {
         return topics
           .map(topic => {
             if (typeof topic !== 'string') return null
-            return topic.trim().replace(/^["'`]+|["'`]+$/g, '').replace(/["'`]/g, '').trim()
+            return topic
+              .trim()
+              .replace(/^["'`]+|["'`]+$/g, '') // Remove quotes from start and end
+              .replace(/["'`]/g, '') // Remove any remaining quotes
+              .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+              .trim()
           })
-          .filter((topic): topic is string => topic !== null)
+          .filter((topic): topic is string => topic !== null && topic.length >= 2)
           .filter((topic, index, arr) => arr.indexOf(topic) === index)
       }
 
@@ -227,9 +232,14 @@ export async function GET(request: NextRequest) {
         return companies
           .map(company => {
             if (typeof company !== 'string') return null
-            return company.trim().replace(/^["'`]+|["'`]+$/g, '').replace(/["'`]/g, '').trim()
+            return company
+              .trim()
+              .replace(/^["'`]+|["'`]+$/g, '') // Remove quotes from start and end
+              .replace(/["'`]/g, '') // Remove any remaining quotes
+              .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+              .trim()
           })
-          .filter((company): company is string => company !== null)
+          .filter((company): company is string => company !== null && company.length >= 2)
           .filter((company, index, arr) => arr.indexOf(company) === index)
       }
 
