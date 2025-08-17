@@ -1,5 +1,6 @@
 import { AuthProvider } from "@/components/auth/auth-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { Analytics } from "@vercel/analytics/next"
 import type { Metadata } from "next"
 import { Playfair_Display, Source_Sans_3 } from "next/font/google"
 import type React from "react"
@@ -126,6 +127,7 @@ export default function RootLayout({
       <body className="font-sans">
         <AuthProvider>{children}</AuthProvider>
         <Toaster />
+        <Analytics />
       </body>
     </html>
   )
