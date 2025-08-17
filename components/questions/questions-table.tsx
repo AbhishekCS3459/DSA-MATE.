@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 import type { Question, QuestionFilters, SortOptions } from "@/lib/types"
-import { BookOpen, ChevronLeft, ChevronRight, ExternalLink, FileText, Loader2 } from "lucide-react"
+import { BookOpen, ChevronLeft, ChevronRight, ExternalLink, FileText, Loader2, RefreshCw } from "lucide-react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
@@ -34,6 +34,27 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [totalQuestions, setTotalQuestions] = useState(0)
+
+  // Function to clean topics and companies data
+  const cleanDisplayData = (data: string[]) => {
+    if (!Array.isArray(data)) return []
+    
+    return data
+      .map(item => {
+        if (typeof item !== 'string') return null
+        
+        // Remove quotes and clean the item
+        let cleaned = item
+          .trim()
+          .replace(/^["'`]+|["'`]+$/g, '') // Remove quotes from start and end
+          .replace(/["'`]/g, '') // Remove any remaining quotes
+          .trim()
+        
+        return cleaned
+      })
+      .filter((item): item is string => item !== null && item !== 'undefined')
+      .filter((item, index, arr) => arr.indexOf(item) === index) // Remove duplicates
+  }
 
   useEffect(() => {
     setCurrentPage(1) // Reset to first page when filters change
@@ -142,6 +163,39 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
 
   return (
     <div className="overflow-visible">
+      {/* Data Quality Warning */}
+      {questions.some(q => 
+        q.topics.some(t => t.includes('"') || t.includes("'") || t === 'undefined') ||
+        q.companies.some(c => c.includes('"') || c.includes("'") || c === 'undefined')
+      ) && (
+        <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md mb-4">
+          <div className="flex items-start gap-3">
+            <div className="w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+              ⚠️
+            </div>
+            <div className="flex-1">
+              <h4 className="font-medium text-amber-800 dark:text-amber-200 mb-1">
+                Data Quality Issue Detected
+              </h4>
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                Some questions have malformed topics or companies (with quotes, duplicates, or undefined values). 
+                The table will display cleaned versions, but you may want to contact an admin to fix the underlying data.
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={fetchQuestions}
+              disabled={loading}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">
@@ -191,10 +245,10 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
                   {question.acceptanceRate ? `${question.acceptanceRate}%` : "-"}
                 </TableCell>
                 <TableCell>
-                  <TopicTags topics={question.topics} maxVisible={3} />
+                  <TopicTags topics={cleanDisplayData(question.topics)} maxVisible={3} />
                 </TableCell>
                 <TableCell>
-                  <CompanyTags companies={question.companies} maxVisible={2} />
+                  <CompanyTags companies={cleanDisplayData(question.companies)} maxVisible={2} />
                 </TableCell>
                 <TableCell>
                   {question.link && (

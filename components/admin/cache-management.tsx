@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { Activity, Clock, Database, HardDrive, RefreshCw, Trash2 } from "lucide-react"
+import { Activity, Clock, Database, HardDrive, RefreshCw, Tags, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 
 interface CacheStats {
@@ -89,6 +89,36 @@ export function CacheManagement() {
     })
   }
 
+  const clearFiltersCache = async () => {
+    setLoading(true)
+    try {
+      // Use the new regenerate-filters API route
+      const response = await fetch("/api/admin/regenerate-filters", {
+        method: "POST",
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        toast({
+          title: "Filters Cache Regenerated",
+          description: `Successfully regenerated filters cache. Found ${data.topicsCount} clean topics and ${data.companiesCount} clean companies.`,
+        })
+        fetchCacheStats() // Refresh stats
+      } else {
+        throw new Error("Failed to regenerate filters cache")
+      }
+    } catch (error) {
+      console.error("Error regenerating filters cache:", error)
+      toast({
+        title: "Error",
+        description: "Failed to regenerate filters cache",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const clearAllCaches = async () => {
     setLoading(true)
     try {
@@ -115,6 +145,41 @@ export function CacheManagement() {
       toast({
         title: "Error",
         description: "Failed to clear caches",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const cleanupTopics = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch("/api/admin/cleanup-topics", {
+        method: "POST",
+      })
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        toast({
+          title: "Topics Cleanup Successful",
+          description: `${data.message}. ${data.cleanedCount} questions were updated.`,
+        })
+        
+        // Refresh cache stats to show updated state
+        fetchCacheStats()
+      } else {
+        toast({
+          title: "Topics Cleanup Failed",
+          description: data.error || "Failed to cleanup topics",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error cleaning up topics:", error)
+      toast({
+        title: "Topics Cleanup Error",
+        description: "Failed to cleanup topics. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -205,20 +270,49 @@ export function CacheManagement() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3">
-            <Button onClick={fetchCacheStats} disabled={loading} className="flex items-center gap-2">
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              Refresh Stats
-            </Button>
-            <Button 
-              onClick={handleClearCachesClick} 
-              disabled={loading} 
-              variant="destructive"
-              className="flex items-center gap-2"
-            >
-              <Trash2 className="h-4 w-4" />
-              Clear All Caches
-            </Button>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Button onClick={fetchCacheStats} disabled={loading} className="flex items-center gap-2">
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                Refresh Stats
+              </Button>
+              <Button 
+                onClick={clearFiltersCache} 
+                disabled={loading} 
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Tags className="h-4 w-4" />
+                Regenerate Filters Cache
+              </Button>
+              <Button 
+                onClick={handleClearCachesClick} 
+                disabled={loading} 
+                variant="destructive"
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Clear All Caches
+              </Button>
+              <Button 
+                onClick={cleanupTopics} 
+                disabled={loading} 
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Tags className="h-4 w-4" />
+                Cleanup Topics & Companies
+              </Button>
+            </div>
+            
+            <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded-md border border-blue-200 dark:border-blue-800">
+              <p className="font-medium mb-1">💡 Recommended order for cleaning up data:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>First, run "Cleanup Topics & Companies" to fix malformed data in the database</li>
+                <li>Then, run "Regenerate Filters Cache" to refresh the filter options</li>
+                <li>Finally, refresh the page to see the cleaned data</li>
+              </ol>
+            </div>
           </div>
 
           {/* Cache Keys Details */}
@@ -263,6 +357,8 @@ export function CacheManagement() {
               <p>• <strong>Filter Options:</strong> Caches available topics and companies for 30 minutes</p>
               <p>• <strong>Auto-cleanup:</strong> Expired cache entries are automatically removed every 5 minutes</p>
               <p>• <strong>Cache Invalidation:</strong> Automatically cleared when questions, notes, or progress are updated</p>
+              <p>• <strong>Topics Cleanup:</strong> Removes quotes, duplicates, and malformed data from topics and companies</p>
+              <p>• <strong>Filters Regeneration:</strong> Manually regenerates clean filter options from the database</p>
             </CardContent>
           </Card>
         </CardContent>

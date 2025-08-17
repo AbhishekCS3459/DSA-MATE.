@@ -2,11 +2,11 @@ import { CacheManagement } from "@/components/admin/cache-management"
 import { ChangeLog } from "@/components/admin/change-log"
 import { CSVUpload } from "@/components/admin/csv-upload"
 import { QuestionsManagement } from "@/components/admin/questions-management"
+import { UserManagement } from "@/components/admin/user-management"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { authOptions } from "@/lib/auth"
-import { ArrowLeft, BarChart3, Database, Edit2, FileText, Shield, Upload } from "lucide-react"
+import { ArrowLeft, Database, Edit2, FileText, Shield, Upload, Users } from "lucide-react"
 import { getServerSession } from "next-auth"
 import Link from "next/link"
 import { redirect } from "next/navigation"
@@ -60,9 +60,9 @@ export default async function AdminPage() {
               <Database className="h-4 w-4" />
               Cache Management
             </TabsTrigger>
-            <TabsTrigger value="stats" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Statistics
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              User Management
             </TabsTrigger>
           </TabsList>
 
@@ -82,19 +82,8 @@ export default async function AdminPage() {
             <CacheManagement />
           </TabsContent>
 
-          <TabsContent value="stats">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Statistics</CardTitle>
-                <CardDescription>Overview of questions, users, and activity</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">Statistics dashboard coming soon...</p>
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="users">
+            <UserManagement />
           </TabsContent>
         </Tabs>
       </main>

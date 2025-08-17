@@ -36,6 +36,46 @@ function calculateAcceptanceRate(frequency: number | null, acceptanceRate: strin
   return null
 }
 
+function cleanAndDeduplicateArray(arr: string[]): string[] {
+  if (!Array.isArray(arr)) {
+    return []
+  }
+  
+  const cleaned = arr
+    .map(item => {
+      if (typeof item !== 'string') {
+        return null
+      }
+      
+      // Remove all types of quotes and extra whitespace
+      let cleaned = item
+        .trim()
+        .replace(/^["'`]+|["'`]+$/g, '') // Remove quotes from start and end
+        .replace(/["'`]/g, '') // Remove any remaining quotes
+        .trim()
+      
+      // Handle cases where the item might be a JSON string
+      if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(cleaned)
+          if (Array.isArray(parsed)) {
+            return parsed.map(p => String(p).trim()).filter(Boolean)
+          }
+        } catch (e) {
+          // If JSON parsing fails, continue with the cleaned string
+        }
+      }
+      
+      return cleaned
+    })
+    .filter((item): item is string | string[] => item !== null) // Remove null values and type guard
+    .flat() // Flatten any nested arrays from JSON parsing
+    .filter((item, index, array) => array.indexOf(item) === index) // Remove duplicates
+    .sort() // Sort alphabetically for consistency
+  
+  return cleaned
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -115,18 +155,12 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Parse topics and companies
+        // Parse topics and companies with proper deduplication
         const topics = row.topics
-          ? row.topics
-              .split(",")
-              .map((t) => t.trim())
-              .filter(Boolean)
+          ? cleanAndDeduplicateArray(row.topics.split(","))
           : []
         const companies = row.companies
-          ? row.companies
-              .split(",")
-              .map((c) => c.trim())
-              .filter(Boolean)
+          ? cleanAndDeduplicateArray(row.companies.split(","))
           : []
 
         // Check if question already exists
@@ -151,9 +185,9 @@ export async function POST(request: NextRequest) {
             companies: existingQuestion.companies,
           }
 
-          // Merge topics and companies (append new ones)
-          const mergedTopics = [...new Set([...existingQuestion.topics, ...topics])]
-          const mergedCompanies = [...new Set([...existingQuestion.companies, ...companies])]
+          // Merge topics and companies with proper deduplication
+          const mergedTopics = cleanAndDeduplicateArray([...existingQuestion.topics, ...topics])
+          const mergedCompanies = cleanAndDeduplicateArray([...existingQuestion.companies, ...companies])
 
           const frequency = row.frequency ? Number.parseInt(row.frequency) : existingQuestion.frequency
           const calculatedAcceptanceRate = calculateAcceptanceRate(frequency, row.acceptanceRate || null)

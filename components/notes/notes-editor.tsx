@@ -5,17 +5,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import { getTemplateById, noteTemplates } from "@/lib/note-templates"
 import type { Question, UserNote } from "@/lib/types"
 import { ExternalLink, FileText, Save, Trash2, Volume2 } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import ReactMarkdown from "react-markdown"
-import rehypeHighlight from "rehype-highlight"
-import rehypeRaw from "rehype-raw"
-import remarkGfm from "remark-gfm"
+import { TiptapEditor } from "./tiptap-editor"
 import { VoiceRecorder } from "./voice-recorder"
 
 interface NotesEditorProps {
@@ -209,30 +204,14 @@ export function NotesEditor({ question, existingNote, onSave, onDelete, onClose 
             </Card>
           )}
 
-          {/* Editor Tabs */}
-          <Tabs defaultValue="write" className="w-full">
-            <TabsList>
-              <TabsTrigger value="write">Write</TabsTrigger>
-              <TabsTrigger value="preview">Preview</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="write" className="space-y-4">
-              <Textarea
-                placeholder="Write your notes in Markdown..."
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="min-h-[400px] font-mono"
-              />
-            </TabsContent>
-
-            <TabsContent value="preview" className="space-y-4">
-              <div className="border rounded-lg p-4 min-h-[400px] prose prose-sm max-w-none dark:prose-invert">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, rehypeRaw]}>
-                  {content || "*No content to preview*"}
-                </ReactMarkdown>
-              </div>
-            </TabsContent>
-          </Tabs>
+          {/* Rich Text Editor */}
+          <div className="space-y-4">
+            <TiptapEditor
+              content={content}
+              onChange={setContent}
+              placeholder="Write your notes..."
+            />
+          </div>
 
           {/* Action Buttons */}
           <div className="flex items-center justify-between">
@@ -249,7 +228,7 @@ export function NotesEditor({ question, existingNote, onSave, onDelete, onClose 
               )}
             </div>
             <div className="text-sm text-muted-foreground">
-              {content.length} characters • {content.split(/\s+/).filter(Boolean).length} words
+              {content.replace(/<[^>]*>/g, '').length} characters • {content.replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length} words
             </div>
           </div>
         </div>

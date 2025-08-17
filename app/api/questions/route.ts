@@ -168,8 +168,35 @@ export async function GET(request: NextRequest) {
         },
       })
 
-      allTopics = [...new Set(allQuestions.flatMap((q) => q.topics))].sort()
-      allCompanies = [...new Set(allQuestions.flatMap((q) => q.companies))].sort()
+      // Clean and deduplicate topics and companies
+      const cleanTopics = (topics: string[]) => {
+        if (!Array.isArray(topics)) return []
+        return topics
+          .map(topic => {
+            if (typeof topic !== 'string') return null
+            return topic.trim().replace(/^["'`]+|["'`]+$/g, '').replace(/["'`]/g, '').trim()
+          })
+          .filter((topic): topic is string => topic !== null)
+          .filter((topic, index, arr) => arr.indexOf(topic) === index)
+      }
+
+      const cleanCompanies = (companies: string[]) => {
+        if (!Array.isArray(companies)) return []
+        return companies
+          .map(company => {
+            if (typeof company !== 'string') return null
+            return company.trim().replace(/^["'`]+|["'`]+$/g, '').replace(/["'`]/g, '').trim()
+          })
+          .filter((company): company is string => company !== null)
+          .filter((company, index, arr) => arr.indexOf(company) === index)
+      }
+
+      // Process all topics and companies
+      const allProcessedTopics = allQuestions.flatMap(q => cleanTopics(q.topics || []))
+      const allProcessedCompanies = allQuestions.flatMap(q => cleanCompanies(q.companies || []))
+
+      allTopics = [...new Set(allProcessedTopics)].sort()
+      allCompanies = [...new Set(allProcessedCompanies)].sort()
       
       // Cache filter options for longer
       setCachedQuestionsData(filtersCacheKey, { topics: allTopics, companies: allCompanies }, CACHE_TTL.FILTERS)

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { QuestionFilters, SortOptions } from "@/lib/types"
-import { ArrowUpDown, Filter, Search, X } from "lucide-react"
+import { ArrowUpDown, Filter, RefreshCw, Search, X } from "lucide-react"
 import { useEffect, useState } from "react"
 
 interface QuestionsFiltersProps {
@@ -20,22 +20,78 @@ interface QuestionsFiltersProps {
 export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSortChange }: QuestionsFiltersProps) {
   const [availableTopics, setAvailableTopics] = useState<string[]>([])
   const [availableCompanies, setAvailableCompanies] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     // Fetch available filter options
     fetchFilterOptions()
   }, [])
 
+  // Function to clean topics and companies data
+  const cleanFilterData = (data: string[]) => {
+    if (!Array.isArray(data)) return []
+    
+    return data
+      .map(item => {
+        if (typeof item !== 'string') return null
+        
+        // Remove quotes and clean the item
+        let cleaned = item
+          .trim()
+          .replace(/^["'`]+|["'`]+$/g, '') // Remove quotes from start and end
+          .replace(/["'`]/g, '') // Remove any remaining quotes
+          .trim()
+        
+        return cleaned
+      })
+      .filter((item): item is string => item !== null && item !== 'undefined')
+      .filter((item, index, arr) => arr.indexOf(item) === index) // Remove duplicates
+      .sort() // Sort alphabetically
+  }
+
   const fetchFilterOptions = async () => {
     try {
+      setLoading(true)
       const response = await fetch("/api/questions")
       const data = await response.json()
       if (response.ok) {
-        setAvailableTopics(data.filters.topics)
-        setAvailableCompanies(data.filters.companies)
+        // Clean the data before setting it
+        const cleanedTopics = cleanFilterData(data.filters.topics)
+        const cleanedCompanies = cleanFilterData(data.filters.companies)
+        
+        setAvailableTopics(cleanedTopics)
+        setAvailableCompanies(cleanedCompanies)
       }
     } catch (error) {
       console.error("Error fetching filter options:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const forceRefreshFilters = async () => {
+    try {
+      setLoading(true)
+      // Force refresh by adding a cache-busting parameter
+      const response = await fetch(`/api/questions?t=${Date.now()}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+      const data = await response.json()
+      if (response.ok) {
+        // Clean the data before setting it
+        const cleanedTopics = cleanFilterData(data.filters.topics)
+        const cleanedCompanies = cleanFilterData(data.filters.companies)
+        
+        setAvailableTopics(cleanedTopics)
+        setAvailableCompanies(cleanedCompanies)
+      }
+    } catch (error) {
+      console.error("Error force refreshing filter options:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -157,6 +213,28 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
 
       {/* Advanced Filters */}
       <div className="flex flex-wrap gap-2">
+        {/* Refresh Filters Button */}
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={forceRefreshFilters}
+          disabled={loading}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          Refresh Filters
+        </Button>
+
+        {/* Filter Data Quality Note */}
+        {(availableTopics.some(t => t.includes('"') || t.includes("'")) || 
+          availableTopics.includes('undefined') || 
+          availableTopics.length === 0) && (
+          <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 rounded-md border border-amber-200 dark:border-amber-800">
+            <p className="font-medium mb-1">⚠️ Filter data needs cleanup</p>
+            <p>Some topics may have formatting issues. Use the "Refresh Filters" button or contact an admin to clean up the data.</p>
+          </div>
+        )}
+
         {/* Topics Filter */}
         <Popover>
           <PopoverTrigger asChild>
@@ -172,24 +250,35 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
           </PopoverTrigger>
           <PopoverContent className="w-80">
             <div className="space-y-2">
-              <h4 className="font-medium">Select Topics</h4>
-              <div className="max-h-60 overflow-y-auto space-y-2">
-                {availableTopics.map((topic) => (
-                  <div key={topic} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`topic-${topic}`}
-                      checked={filters.topics?.includes(topic) || false}
-                      onCheckedChange={() => handleTopicToggle(topic)}
-                    />
-                    <label
-                      htmlFor={`topic-${topic}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {topic}
-                    </label>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium">Select Topics</h4>
+                <span className="text-xs text-muted-foreground">
+                  {availableTopics.length} available
+                </span>
               </div>
+              {availableTopics.length === 0 ? (
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  No topics available. Try refreshing the filters.
+                </div>
+              ) : (
+                <div className="max-h-60 overflow-y-auto space-y-2">
+                  {availableTopics.map((topic) => (
+                    <div key={topic} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`topic-${topic}`}
+                        checked={filters.topics?.includes(topic) || false}
+                        onCheckedChange={() => handleTopicToggle(topic)}
+                      />
+                      <label
+                        htmlFor={`topic-${topic}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {topic}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </PopoverContent>
         </Popover>
@@ -209,24 +298,35 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
           </PopoverTrigger>
           <PopoverContent className="w-80">
             <div className="space-y-2">
-              <h4 className="font-medium">Select Companies</h4>
-              <div className="max-h-60 overflow-y-auto space-y-2">
-                {availableCompanies.map((company) => (
-                  <div key={company} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`company-${company}`}
-                      checked={filters.companies?.includes(company) || false}
-                      onCheckedChange={() => handleCompanyToggle(company)}
-                    />
-                    <label
-                      htmlFor={`company-${company}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {company}
-                    </label>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium">Select Companies</h4>
+                <span className="text-xs text-muted-foreground">
+                  {availableCompanies.length} available
+                </span>
               </div>
+              {availableCompanies.length === 0 ? (
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  No companies available. Try refreshing the filters.
+                </div>
+              ) : (
+                <div className="max-h-60 overflow-y-auto space-y-2">
+                  {availableCompanies.map((company) => (
+                    <div key={company} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`company-${company}`}
+                        checked={filters.companies?.includes(company) || false}
+                        onCheckedChange={() => handleCompanyToggle(company)}
+                      />
+                      <label
+                        htmlFor={`company-${company}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {company}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </PopoverContent>
         </Popover>
