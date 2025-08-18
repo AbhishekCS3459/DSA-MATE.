@@ -52,7 +52,10 @@ export default function ProfilePage() {
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
+        <div className="flex items-center space-x-2 text-muted-foreground">
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <span>Loading profile...</span>
+        </div>
       </div>
     )
   }

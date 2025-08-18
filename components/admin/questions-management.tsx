@@ -250,11 +250,52 @@ export function QuestionsManagement() {
       <Card>
         <CardHeader>
           <CardTitle>Questions Management</CardTitle>
-          <CardDescription>Loading questions...</CardDescription>
+          <CardDescription>Preparing questions for management...</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <div className="space-y-4">
+            {/* Skeleton rows */}
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg animate-pulse">
+                {/* Title skeleton */}
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                </div>
+                
+                {/* Difficulty skeleton */}
+                <div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                
+                {/* Frequency skeleton */}
+                <div className="w-20 h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                
+                {/* Acceptance rate skeleton */}
+                <div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                
+                {/* Link skeleton */}
+                <div className="w-20 h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                
+                {/* Topics skeleton */}
+                <div className="w-24 h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                
+                {/* Companies skeleton */}
+                <div className="w-24 h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                
+                {/* Admin actions skeleton */}
+                <div className="flex space-x-2">
+                  <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                </div>
+              </div>
+            ))}
+            
+            {/* Loading indicator at bottom */}
+            <div className="flex items-center justify-center py-6">
+              <div className="flex items-center space-x-2 text-muted-foreground">
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm">Loading questions...</span>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

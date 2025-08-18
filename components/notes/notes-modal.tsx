@@ -109,8 +109,37 @@ export function NotesModal({ question, isOpen, onClose }: NotesModalProps) {
 
               <ScrollArea className="h-[500px]">
                 {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="text-sm text-muted-foreground">Loading notes...</div>
+                  <div className="space-y-4">
+                    {/* Skeleton note cards */}
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="border rounded-lg p-4 animate-pulse">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            {/* Template badge skeleton */}
+                            <div className="w-16 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                            {/* Date skeleton */}
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                              <div className="w-20 h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Content skeleton */}
+                        <div className="space-y-2">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {/* Loading indicator */}
+                    <div className="flex items-center justify-center py-4">
+                      <div className="flex items-center space-x-2 text-muted-foreground">
+                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-sm">Loading notes...</span>
+                      </div>
+                    </div>
                   </div>
                 ) : notes.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
