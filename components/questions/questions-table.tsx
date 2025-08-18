@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useQuestionsCache } from "@/hooks/use-questions-cache"
 import { useToast } from "@/hooks/use-toast"
 import type { Question, QuestionFilters, SortOptions } from "@/lib/types"
-import { CheckCircle, ChevronLeft, ChevronRight, Circle, ExternalLink, FileText, Lock, X } from "lucide-react"
+import { CheckCircle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, ExternalLink, FileText, Info, Lock, X, Zap } from "lucide-react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { CompanyTags } from "./company-tags"
 import { TopicTags } from "./topic-tags"
 
@@ -39,6 +40,22 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isPageRestricted, setIsPageRestricted] = useState(false)
   const [showSignInModal, setShowSignInModal] = useState(true)
+  const [cacheHit, setCacheHit] = useState(false)
+  const [isPrefetching, setIsPrefetching] = useState(false)
+  const [showCacheStats, setShowCacheStats] = useState(false)
+  const [cachePerformance, setCachePerformance] = useState<{ loadTime: number; cacheTime: number } | null>(null)
+
+  // Initialize caching hook
+  const {
+    getCachedData,
+    setCachedData,
+    prefetchNextPages,
+    clearExpiredCache,
+    getCacheStats,
+    isInitialized: isCacheInitialized,
+    cache,
+    generateCacheKey
+  } = useQuestionsCache()
 
   useEffect(() => {
     fetchQuestions()
@@ -58,9 +75,85 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
     }
   }, [isAuthenticated])
 
-  const fetchQuestions = async () => {
+  // Initialize cache warming for common filters
+  useEffect(() => {
+    if (isCacheInitialized && !loading) {
+      // Warm cache with common filter combinations
+      const commonFilters = [
+        { ...filters, difficulty: "EASY" as const },
+        { ...filters, difficulty: "MEDIUM" as const },
+        { ...filters, difficulty: "HARD" as const },
+        { ...filters, status: "DONE" as const },
+        { ...filters, status: "NOT_DONE" as const }
+      ]
+      
+      commonFilters.forEach(filterSet => {
+        const key = generateCacheKey(filterSet, sortOptions, 1, pageSize)
+        if (!cache[key]) {
+          // Prefetch first page for common filter combinations
+          setTimeout(() => {
+            fetch(`/api/questions?${new URLSearchParams({
+              page: "1",
+              limit: pageSize.toString(),
+              search: filterSet.search || "",
+              difficulty: filterSet.difficulty || "",
+              topics: filterSet.topics?.join(",") || "",
+              companies: filterSet.companies?.join(",") || "",
+              status: filterSet.status || "ALL",
+              sortField: sortOptions.field,
+              sortDirection: sortOptions.direction,
+            })}`).then(response => {
+              if (response.ok) {
+                response.json().then(data => {
+                  setCachedData(filterSet, sortOptions, 1, pageSize, {
+                    questions: data.questions || [],
+                    totalCount: data.totalCount || 0,
+                    subscription: data.subscription || null,
+                    premiumRequired: data.premiumRequired || false,
+                    isAuthenticated: data.isAuthenticated || false,
+                    isPageRestricted: data.isPageRestricted || false,
+                  })
+                })
+              }
+            }).catch(() => {}) // Silently fail for cache warming
+          }, Math.random() * 2000) // Stagger requests
+        }
+      })
+    }
+  }, [isCacheInitialized, filters, sortOptions, pageSize, cache, setCachedData, generateCacheKey])
+
+  const fetchQuestions = useCallback(async (forceRefresh = false) => {
+    const startTime = performance.now()
+    
     try {
+      // Check cache first (unless forcing refresh)
+      if (!forceRefresh && isCacheInitialized) {
+        const cachedData = getCachedData(filters, sortOptions, currentPage, pageSize)
+        if (cachedData) {
+          const cacheTime = performance.now() - startTime
+          setCachePerformance({ loadTime: 0, cacheTime })
+          
+          setQuestions(cachedData.questions)
+          setTotalCount(cachedData.totalCount)
+          setSubscription(cachedData.subscription)
+          setPremiumRequired(cachedData.premiumRequired)
+          setIsAuthenticated(cachedData.isAuthenticated)
+          setIsPageRestricted(cachedData.isPageRestricted)
+          setCacheHit(true)
+          setLoading(false)
+          
+          // Start prefetching next pages in background
+          if (cachedData.totalCount > 0) {
+            prefetchNextPages(filters, sortOptions, currentPage, pageSize, cachedData.totalCount)
+          }
+          
+          return
+        }
+      }
+
       setLoading(true)
+      setCacheHit(false)
+      
       const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: pageSize.toString(),
@@ -76,12 +169,31 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
       const response = await fetch(`/api/questions?${params}`)
       if (response.ok) {
         const data = await response.json()
+        const loadTime = performance.now() - startTime
+        
         setQuestions(data.questions || [])
         setTotalCount(data.totalCount || 0)
         setSubscription(data.subscription || null)
         setPremiumRequired(data.premiumRequired || false)
         setIsAuthenticated(data.isAuthenticated || false)
         setIsPageRestricted(data.isPageRestricted || false)
+        
+        // Cache the data
+        if (isCacheInitialized) {
+          setCachedData(filters, sortOptions, currentPage, pageSize, {
+            questions: data.questions || [],
+            totalCount: data.totalCount || 0,
+            subscription: data.subscription || null,
+            premiumRequired: data.premiumRequired || false,
+            isAuthenticated: data.isAuthenticated || false,
+            isPageRestricted: data.isPageRestricted || false,
+          })
+          
+          // Start prefetching next pages in background
+          if (data.totalCount > 0) {
+            prefetchNextPages(filters, sortOptions, currentPage, pageSize, data.totalCount)
+          }
+        }
         
         // If page is restricted, reset to page 1
         if (data.isPageRestricted) {
@@ -100,7 +212,7 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters, sortOptions, currentPage, pageSize, isCacheInitialized, getCachedData, setCachedData, prefetchNextPages, toast])
 
   const cleanDisplayData = (data: string[]) => {
     if (!Array.isArray(data)) return []
@@ -187,47 +299,67 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
       <Card>
         <CardHeader>
           <CardTitle>Questions</CardTitle>
-          <CardDescription>Preparing your questions...</CardDescription>
+
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {/* Skeleton rows */}
+          <div className="space-y-6">
+            {/* Enhanced loading header */}
+            <div className="text-center py-8">
+              <div className="flex items-center justify-center mb-4">
+                <div className="relative skeleton-float">
+                  <div className="w-16 h-16 border-4 border-primary/20 rounded-full"></div>
+                  <div className="absolute inset-0 w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">Preparing your questions...</h3>
+              <p className="text-muted-foreground text-sm mb-4">We're gathering the perfect problems for you</p>
+              
+              {/* Cache status */}
+              {isCacheInitialized && (
+                <div className="inline-flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-full text-xs text-muted-foreground">
+                  <Zap className="h-3 w-3 text-yellow-500" />
+                  <span>Intelligent caching enabled</span>
+                </div>
+              )}
+            </div>
+
+            {/* Enhanced skeleton rows with better animations */}
             {Array.from({ length: 8 }).map((_, index) => (
-              <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg animate-pulse">
-                {/* Question number skeleton */}
-                <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+              <div key={index} className={`flex items-center space-x-4 p-4 border rounded-lg skeleton-slide-in skeleton-stagger-${index + 1}`}>
+                {/* Question number skeleton with pulse effect */}
+                <div className="w-8 h-8 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-full skeleton-pulse-glow"></div>
                 
-                {/* Question title skeleton */}
+                {/* Question title skeleton with staggered animation */}
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                  <div className="h-4 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded w-3/4 skeleton-shimmer"></div>
+                  <div className="h-3 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded w-1/2 skeleton-shimmer"></div>
                 </div>
                 
                 {/* Difficulty skeleton */}
-                <div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                <div className="w-16 h-6 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-full skeleton-shimmer"></div>
                 
                 {/* Frequency skeleton */}
-                <div className="w-20 h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="w-20 h-6 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded skeleton-shimmer"></div>
                 
                 {/* Acceptance rate skeleton */}
-                <div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="w-16 h-6 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded skeleton-shimmer"></div>
                 
                 {/* Status skeleton */}
-                <div className="w-20 h-6 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                <div className="w-20 h-6 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-full skeleton-shimmer"></div>
                 
                 {/* Actions skeleton */}
                 <div className="flex space-x-2">
-                  <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                  <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  <div className="w-8 h-8 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded skeleton-pulse-glow"></div>
+                  <div className="w-8 h-8 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded skeleton-pulse-glow"></div>
                 </div>
               </div>
             ))}
             
-            {/* Loading indicator at bottom */}
-            <div className="flex items-center justify-center py-6">
-              <div className="flex items-center space-x-2 text-muted-foreground">
-                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-sm">Loading questions...</span>
+
+            {/* Progress bar */}
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+              <div className="h-2 bg-gradient-to-r from-primary to-accent rounded-full skeleton-shimmer relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
               </div>
             </div>
           </div>
@@ -316,31 +448,97 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
                     {" "}(Limited to {subscription.maxQuestions} in free plan)
                   </span>
                 )}
+                {cacheHit && (
+                  <span className="text-green-600 dark:text-green-400 ml-2">
+                    <Zap className="h-3 w-3 inline mr-1" />
+                    Cached
+                    {cachePerformance && (
+                      <span className="text-xs ml-1">
+                        (saved {Math.round(cachePerformance.loadTime - cachePerformance.cacheTime)}ms)
+                      </span>
+                    )}
+                  </span>
+                )}
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchQuestions(true)}
+                disabled={loading}
+                className="text-xs"
+              >
+                Refresh
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearExpiredCache}
+                disabled={loading}
+                className="text-xs text-muted-foreground"
+              >
+                Clear Cache
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCacheStats(!showCacheStats)}
+                className="text-xs text-muted-foreground"
+              >
+                <Info className="h-3 w-3 mr-1" />
+                Cache Info
+                {showCacheStats ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
+              </Button>
               <Select value={pageSize.toString()} onValueChange={(value) => handlePageSizeChange(Number(value))}>
                 <SelectTrigger className="w-20">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
                   <SelectItem value="25">25</SelectItem>
-                  {isAuthenticated && (
-                    <>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                    </>
-                  )}
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
                 </SelectContent>
               </Select>
-              {!isAuthenticated && (
-                <span className="text-xs text-muted-foreground">
-                  Sign in for more options
-                </span>
-              )}
             </div>
           </div>
         </CardHeader>
+        
+        {/* Cache Statistics Panel */}
+        {showCacheStats && (
+          <div className="px-6 py-4 border-b bg-muted/20">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              {(() => {
+                const stats = getCacheStats()
+                return (
+                  <>
+                    <div className="text-center">
+                      <div className="text-lg font-semibold text-primary">{stats.validEntries}</div>
+                      <div className="text-xs text-muted-foreground">Cached Pages</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-semibold text-accent">{stats.totalEntries}</div>
+                      <div className="text-xs text-muted-foreground">Total Entries</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-semibold text-green-600">{Math.round((stats.validEntries / Math.max(stats.totalEntries, 1)) * 100)}%</div>
+                      <div className="text-xs text-muted-foreground">Cache Hit Rate</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-semibold text-blue-600">{Math.round(stats.cacheSize / 1024)}KB</div>
+                      <div className="text-xs text-muted-foreground">Cache Size</div>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+            <div className="mt-3 text-xs text-muted-foreground text-center">
+              Cache expires in 5 minutes • Prefetching next 2 pages • Max 50 entries
+            </div>
+          </div>
+        )}
+        
         <CardContent>
           <div className="border rounded-lg overflow-x-auto">
             <Table>

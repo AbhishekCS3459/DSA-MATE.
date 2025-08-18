@@ -292,8 +292,6 @@ export function QuestionsManagement() {
             {/* Loading indicator at bottom */}
             <div className="flex items-center justify-center py-6">
               <div className="flex items-center space-x-2 text-muted-foreground">
-                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-sm">Loading questions...</span>
               </div>
             </div>
           </div>

@@ -179,3 +179,77 @@
   transform: translateY(-2px);
   box-shadow: 0 10px 25px hsl(var(--primary) / 0.1);
 }
+
+/* Enhanced loading animations for better UX */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes slide-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--muted) / 0.5) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.skeleton-slide-in {
+  animation: slide-in-up 0.6s ease-out forwards;
+}
+
+/* Staggered animation delays for skeleton rows */
+.skeleton-stagger-1 { animation-delay: 0.1s; }
+.skeleton-stagger-2 { animation-delay: 0.2s; }
+.skeleton-stagger-3 { animation-delay: 0.3s; }
+.skeleton-stagger-4 { animation-delay: 0.4s; }
+.skeleton-stagger-5 { animation-delay: 0.5s; }
+.skeleton-stagger-6 { animation-delay: 0.6s; }
+.skeleton-stagger-7 { animation-delay: 0.7s; }
+.skeleton-stagger-8 { animation-delay: 0.8s; }
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.skeleton-float {
+  animation: float 3s ease-in-out infinite;
+}
