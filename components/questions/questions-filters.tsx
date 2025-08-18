@@ -23,6 +23,14 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
   const [availableTopics, setAvailableTopics] = useState<string[]>([])
   const [availableCompanies, setAvailableCompanies] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
+  
+  // Local search states for topics and companies
+  const [topicSearch, setTopicSearch] = useState("")
+  const [companySearch, setCompanySearch] = useState("")
+  
+  // Debounced search states for better performance
+  const [debouncedTopicSearch, setDebouncedTopicSearch] = useState("")
+  const [debouncedCompanySearch, setDebouncedCompanySearch] = useState("")
 
   useEffect(() => {
     // Fetch available filter options
@@ -35,6 +43,21 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
       onFiltersChange({ ...filters, status: "ALL" })
     }
   }, [session, filters.status, onFiltersChange])
+
+  // Debounce search inputs for better performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTopicSearch(topicSearch)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [topicSearch])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCompanySearch(companySearch)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [companySearch])
 
   // Function to clean topics and companies data
   const cleanFilterData = (data: string[]) => {
@@ -153,6 +176,15 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
     })
   }
 
+  // Filter topics and companies based on search
+  const filteredTopics = availableTopics.filter(topic =>
+    topic.toLowerCase().includes(debouncedTopicSearch.toLowerCase())
+  )
+  
+  const filteredCompanies = availableCompanies.filter(company =>
+    company.toLowerCase().includes(debouncedCompanySearch.toLowerCase())
+  )
+
   const hasActiveFilters =
     filters.search ||
     filters.difficulty ||
@@ -268,7 +300,7 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">Select Topics</h4>
                 <span className="text-xs text-muted-foreground">
-                  {availableTopics.length} available
+                  {filteredTopics.length} of {availableTopics.length} available
                 </span>
               </div>
               
@@ -277,24 +309,24 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search topics..."
+                  value={topicSearch}
+                  onChange={(e) => setTopicSearch(e.target.value)}
                   className="pl-10"
-                  onChange={(e) => {
-                    const searchTerm = e.target.value.toLowerCase()
-                    const filtered = availableTopics.filter(topic => 
-                      topic.toLowerCase().includes(searchTerm)
-                    )
-                    // You could implement a local search state here if needed
-                  }}
                 />
               </div>
               
-              {availableTopics.length === 0 ? (
+              {filteredTopics.length === 0 ? (
                 <div className="text-center py-4 text-sm text-muted-foreground">
-                  No topics available. Try refreshing the filters.
+                  {topicSearch ? `No topics found matching "${topicSearch}"` : "No topics available. Try refreshing the filters."}
                 </div>
               ) : (
                 <div className="max-h-60 overflow-y-auto space-y-2">
-                  {availableTopics.map((topic) => (
+                  {topicSearch && (
+                    <div className="text-xs text-muted-foreground pb-2 border-b">
+                      Showing {filteredTopics.length} of {availableTopics.length} topics
+                    </div>
+                  )}
+                  {filteredTopics.map((topic) => (
                     <div key={topic} className="flex items-center space-x-2">
                       <Checkbox
                         id={`topic-${topic}`}
@@ -330,20 +362,37 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-80">
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">Select Companies</h4>
                 <span className="text-xs text-muted-foreground">
-                  {availableCompanies.length} available
+                  {filteredCompanies.length} of {availableCompanies.length} available
                 </span>
               </div>
-              {availableCompanies.length === 0 ? (
+              
+              {/* Search Companies */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search companies..."
+                  value={companySearch}
+                  onChange={(e) => setCompanySearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              
+              {filteredCompanies.length === 0 ? (
                 <div className="text-center py-4 text-sm text-muted-foreground">
-                  No companies available. Try refreshing the filters.
+                  {companySearch ? `No companies found matching "${companySearch}"` : "No companies available. Try refreshing the filters."}
                 </div>
               ) : (
                 <div className="max-h-60 overflow-y-auto space-y-2">
-                  {availableCompanies.map((company) => (
+                  {companySearch && (
+                    <div className="text-xs text-muted-foreground pb-2 border-b">
+                      Showing {filteredCompanies.length} of {availableCompanies.length} companies
+                    </div>
+                  )}
+                  {filteredCompanies.map((company) => (
                     <div key={company} className="flex items-center space-x-2">
                       <Checkbox
                         id={`company-${company}`}
@@ -352,9 +401,10 @@ export function QuestionsFilters({ filters, sortOptions, onFiltersChange, onSort
                       />
                       <label
                         htmlFor={`company-${company}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 min-w-0"
+                        title={company}
                       >
-                        {company}
+                        <span className="truncate block">{company}</span>
                       </label>
                     </div>
                   ))}

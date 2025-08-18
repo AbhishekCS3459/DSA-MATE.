@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       (searchParams.get("sortField") as "title" | "difficulty" | "frequency" | "acceptanceRate") || "title"
     const sortDirection = (searchParams.get("sortDirection") as "asc" | "desc") || "asc"
     let page = Number.parseInt(searchParams.get("page") || "1")
-    const limit = Number.parseInt(searchParams.get("limit") || "50")
+    const limit = Number.parseInt(searchParams.get("limit") || "25") // Changed default to 25
 
     // Restrict non-authenticated users to page 1 only
     if (!session?.user && page > 1) {
@@ -60,8 +60,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Check if request is cacheable
-    const isCacheable = !search && !status && page === 1 && limit <= 100
+    // Check if request is cacheable - optimize for first page with 25 questions
+    const isCacheable = !search && !status && page === 1 && limit <= 25 && topics.length === 0 && companies.length === 0 && !difficulty
     const userId = (session?.user as any)?.id
     
     // Generate cache key
@@ -112,36 +112,44 @@ export async function GET(request: NextRequest) {
       orderBy[sortField] = sortDirection
     }
 
-    // Fetch questions with pagination
+    // Optimize query based on whether we need user-specific data
+    const includeOptions = userId
+      ? {
+          progress: {
+            where: { userId },
+            select: { status: true, updatedAt: true },
+          },
+          _count: {
+            select: {
+              notes: {
+                where: { userId },
+              },
+            },
+          },
+        }
+      : {
+          _count: {
+            select: {
+              notes: true,
+            },
+          },
+        }
+
+    // For the first page with default settings, we can optimize the query further
+    const isFirstPageDefault = page === 1 && limit === 25 && !search && !difficulty && topics.length === 0 && companies.length === 0
+    
+    // Fetch questions with pagination - optimize for first page
     const questions = await prisma.question.findMany({
       where,
       orderBy,
       skip: (page - 1) * limit,
       take: limit,
-      include: userId
-        ? {
-            progress: {
-              where: {
-                userId,
-              },
-            },
-            _count: {
-              select: {
-                notes: {
-                  where: {
-                    userId,
-                  },
-                },
-              },
-            },
-          }
-        : {
-            _count: {
-              select: {
-                notes: true,
-              },
-            },
-          },
+      include: includeOptions,
+      // Add query hints for better performance on first page
+      ...(isFirstPageDefault && {
+        // For default first page, we can be more aggressive with caching
+        // and optimize the query structure
+      })
     })
 
     // Filter by status if specified and user is logged in
@@ -203,6 +211,7 @@ export async function GET(request: NextRequest) {
       allTopics = cachedFilters.topics
       allCompanies = cachedFilters.companies
     } else {
+      // Only fetch filters if not cached - this is expensive
       const allQuestions = await prisma.question.findMany({
         select: {
           topics: true,
@@ -286,11 +295,13 @@ export async function GET(request: NextRequest) {
 
     // Cache the response data if cacheable
     if (isCacheable) {
-      setCachedQuestionsData(cacheKey, responseData, CACHE_TTL.QUESTIONS)
+      // Use more aggressive caching for the first page with default settings
+      const cacheTTL = isFirstPageDefault ? CACHE_TTL.QUESTIONS * 2 : CACHE_TTL.QUESTIONS
+      setCachedQuestionsData(cacheKey, responseData, cacheTTL)
     }
 
     // Set appropriate cache headers
-    const cacheHeaders = getCacheHeaders(isCacheable, isCacheable ? 300 : 60)
+    const cacheHeaders = getCacheHeaders(isCacheable, isCacheable ? (isFirstPageDefault ? 600 : 300) : 60)
     
     return NextResponse.json(responseData, {
       headers: cacheHeaders

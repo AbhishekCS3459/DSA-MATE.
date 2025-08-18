@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 import type { Question, QuestionFilters, SortOptions } from "@/lib/types"
-import { CheckCircle, ChevronLeft, ChevronRight, Circle, ExternalLink, FileText, Lock } from "lucide-react"
+import { CheckCircle, ChevronLeft, ChevronRight, Circle, ExternalLink, FileText, Lock, X } from "lucide-react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
@@ -38,6 +38,7 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
   const [premiumRequired, setPremiumRequired] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isPageRestricted, setIsPageRestricted] = useState(false)
+  const [showSignInModal, setShowSignInModal] = useState(true)
 
   useEffect(() => {
     fetchQuestions()
@@ -49,6 +50,13 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
       setCurrentPage(1)
     }
   }, [isAuthenticated, currentPage])
+
+  // Hide sign-in modal when user becomes authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      setShowSignInModal(false)
+    }
+  }, [isAuthenticated])
 
   const fetchQuestions = async () => {
     try {
@@ -202,34 +210,59 @@ export function QuestionsTable({ filters, sortOptions, onNotesClick }: Questions
       )}
 
       {/* Sign In Prompt for Non-Authenticated Users */}
-      {!isAuthenticated && (
-        <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="flex-shrink-0">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                  <Lock className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+      {!isAuthenticated && showSignInModal && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" 
+          onClick={() => setShowSignInModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="signin-modal-title"
+          aria-describedby="signin-modal-description"
+        >
+          <div className="bg-card border rounded-lg shadow-lg max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                    <Lock className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h3 id="signin-modal-title" className="font-semibold text-foreground text-lg">
+                    Sign in to access more questions
+                  </h3>
                 </div>
+                <button
+                  onClick={() => setShowSignInModal(false)}
+                  className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                  aria-label="Close modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
-                  Sign in to access more questions
-                </h3>
-                <p className="text-blue-700 dark:text-blue-300 text-sm mb-3">
-                  You're currently viewing page 1 of {totalCount} questions. Sign in to access all pages and track your progress.
-                </p>
-                <div className="flex items-center gap-3">
-                  <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
-                    <Link href="/auth/signin">Sign In</Link>
-                  </Button>
-                  <Button asChild variant="outline" size="sm">
-                    <Link href="/auth/signup">Sign Up</Link>
-                  </Button>
-                </div>
+              
+              <p id="signin-modal-description" className="text-muted-foreground text-sm mb-6 leading-relaxed">
+                You're currently viewing page 1 of {totalCount} questions. Sign in to access all pages and track your progress.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button asChild size="lg" className="bg-blue-600 hover:bg-blue-700 flex-1">
+                  <Link href="/auth/signin">Sign In</Link>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="flex-1">
+                  <Link href="/auth/signup">Sign Up</Link>
+                </Button>
+              </div>
+              
+              <div className="mt-4 text-center">
+                <button 
+                  onClick={() => setShowSignInModal(false)} 
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Continue browsing (limited)
+                </button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Questions Table */}
